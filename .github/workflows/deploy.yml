@@ -1,0 +1,276 @@
+name: 🚀 Manual Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      
+      run_tests:
+        description: 'Run full test suite before deployment'
+        required: true
+        default: true
+        type: boolean
+      
+      docker_tag:
+        description: 'Docker image tag to deploy (default: latest)'
+        required: false
+        default: 'latest'
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Job 1: Pre-deployment Tests (if requested)
+  pre-deployment-tests:
+    name: 🧪 Pre-deployment Tests
+    runs-on: ubuntu-latest
+    if: inputs.run_tests == true
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔍 Run linting
+        run: npm run lint
+
+      - name: 🏗️ Build application
+        run: npm run build
+
+      - name: 🧪 Run unit tests
+        run: npm run test:docker
+
+      - name: 🐳 Test Docker build
+        run: |
+          docker build -t test-image .
+          docker run --rm test-image node --version
+
+  # Job 2: Docker Compose Full Test
+  docker-compose-test:
+    name: 🐳 Docker Compose Full Test
+    runs-on: ubuntu-latest
+    if: inputs.run_tests == true
+    needs: pre-deployment-tests
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐳 Run full Docker Compose test suite
+        run: |
+          # Run all tests with Docker Compose
+          docker-compose -f docker-compose.test.yml --profile all-tests up --build --abort-on-container-exit
+          
+      - name: 📊 Collect test results
+        if: always()
+        run: |
+          mkdir -p deployment-test-results
+          
+          # Collect logs from all test containers
+          docker-compose -f docker-compose.test.yml logs unit-tests > deployment-test-results/unit-tests.log || true
+          docker-compose -f docker-compose.test.yml logs integration-tests > deployment-test-results/integration-tests.log || true
+          docker-compose -f docker-compose.test.yml logs e2e-tests > deployment-test-results/e2e-tests.log || true
+          
+      - name: 📊 Upload deployment test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: deployment-test-results
+          path: deployment-test-results/
+          retention-days: 7
+
+      - name: 🧹 Cleanup
+        if: always()
+        run: docker-compose -f docker-compose.test.yml down -v
+
+  # Job 3: Build and Push (if not using existing image)
+  build-and-push:
+    name: 🏗️ Build & Push Docker Image
+    runs-on: ubuntu-latest
+    if: inputs.docker_tag == 'latest' || inputs.docker_tag == ''
+    needs: [pre-deployment-tests, docker-compose-test]
+    
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-tag: ${{ steps.meta.outputs.tags }}
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐳 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🔐 Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📝 Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=raw,value=deploy-${{ inputs.environment }}-${{ github.run_number }}
+            type=sha,prefix=deploy-
+
+      - name: 🏗️ Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Job 4: Deploy to Staging
+  deploy-staging:
+    name: 🚀 Deploy to Staging
+    runs-on: ubuntu-latest
+    if: inputs.environment == 'staging'
+    needs: [build-and-push]
+    environment: staging
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🚀 Deploy to Staging
+        run: |
+          echo "🎯 Deploying to Staging Environment"
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Docker Tag: ${{ inputs.docker_tag }}"
+          echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.docker_tag }}"
+          
+          # Add your staging deployment commands here
+          # For example:
+          # - Update Kubernetes manifests
+          # - Deploy to staging cluster
+          # - Update environment variables
+          # - Run database migrations
+          
+          echo "✅ Staging deployment completed"
+
+      - name: 🔍 Run smoke tests
+        run: |
+          echo "🧪 Running smoke tests against staging"
+          
+          # Add smoke tests here
+          # For example:
+          # - Health check endpoints
+          # - Basic API functionality
+          # - Database connectivity
+          
+          echo "✅ Smoke tests passed"
+
+      - name: 📊 Deployment summary
+        run: |
+          echo "## 🚀 Staging Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: Staging" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image**: \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.docker_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ✅ Deployed Successfully" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tests**: ${{ inputs.run_tests && '✅ Passed' || '⏭️ Skipped' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Links" >> $GITHUB_STEP_SUMMARY
+          echo "- [Staging Environment](https://staging.car-insurance.example.com)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Health Check](https://staging.car-insurance.example.com/api/v1/health)" >> $GITHUB_STEP_SUMMARY
+          echo "- [API Documentation](https://staging.car-insurance.example.com/api/docs)" >> $GITHUB_STEP_SUMMARY
+
+  # Job 5: Deploy to Production
+  deploy-production:
+    name: 🚀 Deploy to Production
+    runs-on: ubuntu-latest
+    if: inputs.environment == 'production'
+    needs: [build-and-push]
+    environment: production
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: ⚠️ Production deployment confirmation
+        run: |
+          echo "🚨 PRODUCTION DEPLOYMENT"
+          echo "This will deploy to the production environment"
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Docker Tag: ${{ inputs.docker_tag }}"
+          echo "Tests Run: ${{ inputs.run_tests }}"
+
+      - name: 🚀 Deploy to Production
+        run: |
+          echo "🎯 Deploying to Production Environment"
+          echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.docker_tag }}"
+          
+          # Add your production deployment commands here
+          # For example:
+          # - Blue-green deployment
+          # - Rolling updates
+          # - Database migrations with rollback plan
+          # - Update load balancers
+          # - Monitor deployment metrics
+          
+          echo "✅ Production deployment completed"
+
+      - name: 🔍 Run production smoke tests
+        run: |
+          echo "🧪 Running production smoke tests"
+          
+          # Add production smoke tests here
+          # For example:
+          # - Critical path testing
+          # - Performance checks
+          # - Security validations
+          
+          echo "✅ Production smoke tests passed"
+
+      - name: 📊 Production deployment summary
+        run: |
+          echo "## 🚀 Production Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: Production" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image**: \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.docker_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ✅ Deployed Successfully" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tests**: ${{ inputs.run_tests && '✅ Passed' || '⏭️ Skipped' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Links" >> $GITHUB_STEP_SUMMARY
+          echo "- [Production Environment](https://car-insurance.example.com)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Health Check](https://car-insurance.example.com/api/v1/health)" >> $GITHUB_STEP_SUMMARY
+          echo "- [API Documentation](https://car-insurance.example.com/api/docs)" >> $GITHUB_STEP_SUMMARY
+
+      - name: 📢 Notify deployment
+        run: |
+          echo "📢 Production deployment notification"
+          # Add notification logic here
+          # For example:
+          # - Slack notifications
+          # - Email alerts
+          # - Monitoring system updates

@@ -1,0 +1,329 @@
+name: 🔒 Security & Dependency Updates
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+  push:
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - 'Dockerfile'
+      - 'docker-compose*.yml'
+
+jobs:
+  # Job 1: Dependency Audit
+  dependency-audit:
+    name: 🔍 Dependency Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔒 Run npm audit
+        id: audit
+        run: |
+          # Run audit and capture output
+          npm audit --audit-level=moderate --json > audit-results.json || true
+          
+          # Check if there are any vulnerabilities
+          VULNERABILITIES=$(cat audit-results.json | jq '.metadata.vulnerabilities.total // 0')
+          echo "vulnerabilities=$VULNERABILITIES" >> $GITHUB_OUTPUT
+          
+          # Display human-readable results
+          npm audit --audit-level=moderate || true
+
+      - name: 📊 Upload audit results
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-audit-results
+          path: audit-results.json
+          retention-days: 30
+
+      - name: 🚨 Create issue for vulnerabilities
+        if: steps.audit.outputs.vulnerabilities != '0'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const auditResults = JSON.parse(fs.readFileSync('audit-results.json', 'utf8'));
+            
+            const title = `🔒 Security vulnerabilities detected - ${auditResults.metadata.vulnerabilities.total} total`;
+            
+            let body = `## 🚨 Security Audit Results\n\n`;
+            body += `**Total vulnerabilities found**: ${auditResults.metadata.vulnerabilities.total}\n\n`;
+            
+            if (auditResults.metadata.vulnerabilities.high > 0) {
+              body += `- 🔴 **High**: ${auditResults.metadata.vulnerabilities.high}\n`;
+            }
+            if (auditResults.metadata.vulnerabilities.moderate > 0) {
+              body += `- 🟡 **Moderate**: ${auditResults.metadata.vulnerabilities.moderate}\n`;
+            }
+            if (auditResults.metadata.vulnerabilities.low > 0) {
+              body += `- 🟢 **Low**: ${auditResults.metadata.vulnerabilities.low}\n`;
+            }
+            
+            body += `\n### 🔧 Recommended Actions\n\n`;
+            body += `1. Run \`npm audit fix\` to automatically fix issues\n`;
+            body += `2. Review and update dependencies manually if needed\n`;
+            body += `3. Check for breaking changes in updated packages\n`;
+            body += `4. Run full test suite after updates\n\n`;
+            
+            body += `### 📊 Details\n\n`;
+            body += `- **Workflow**: [${context.workflow}](${context.payload.repository.html_url}/actions/runs/${context.runId})\n`;
+            body += `- **Commit**: ${context.sha.substring(0, 7)}\n`;
+            body += `- **Date**: ${new Date().toISOString()}\n\n`;
+            
+            body += `> 🤖 This issue was automatically created by the security workflow.\n`;
+            body += `> Please address these vulnerabilities as soon as possible.`;
+            
+            // Check if issue already exists
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'security,dependencies'
+            });
+            
+            const existingIssue = issues.data.find(issue => 
+              issue.title.includes('Security vulnerabilities detected')
+            );
+            
+            if (existingIssue) {
+              // Update existing issue
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingIssue.number,
+                title: title,
+                body: body
+              });
+            } else {
+              // Create new issue
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['security', 'dependencies', 'automated']
+              });
+            }
+
+  # Job 2: Docker Security Scan
+  docker-security-scan:
+    name: 🐳 Docker Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐳 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🏗️ Build Docker image for scanning
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          load: true
+          tags: car-insurance-backend:security-scan
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: 🔍 Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'car-insurance-backend:security-scan'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: 📊 Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: 🔍 Run Trivy for JSON output
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'car-insurance-backend:security-scan'
+          format: 'json'
+          output: 'trivy-results.json'
+
+      - name: 📊 Upload detailed scan results
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-security-scan-results
+          path: |
+            trivy-results.sarif
+            trivy-results.json
+          retention-days: 30
+
+  # Job 3: Code Security Analysis
+  code-security-analysis:
+    name: 🔍 Code Security Analysis
+    runs-on: ubuntu-latest
+    
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔍 Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+
+      - name: 🏗️ Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: 🔍 Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+  # Job 4: Dependency Updates
+  dependency-updates:
+    name: 🔄 Dependency Updates
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔄 Update dependencies
+        id: update
+        run: |
+          # Update patch and minor versions
+          npm update
+          
+          # Check if there are changes
+          if git diff --quiet package-lock.json; then
+            echo "changes=false" >> $GITHUB_OUTPUT
+            echo "No dependency updates available"
+          else
+            echo "changes=true" >> $GITHUB_OUTPUT
+            echo "Dependencies updated"
+          fi
+
+      - name: 🧪 Run tests after updates
+        if: steps.update.outputs.changes == 'true'
+        run: |
+          npm run test:docker
+          npm run build
+
+      - name: 🔒 Run security audit after updates
+        if: steps.update.outputs.changes == 'true'
+        run: npm audit --audit-level=moderate
+
+      - name: 📝 Create Pull Request
+        if: steps.update.outputs.changes == 'true'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'chore: update dependencies'
+          title: '🔄 Automated dependency updates'
+          body: |
+            ## 🔄 Automated Dependency Updates
+            
+            This PR contains automated dependency updates.
+            
+            ### 🔍 Changes
+            - Updated patch and minor versions of dependencies
+            - All tests pass with updated dependencies
+            - Security audit completed successfully
+            
+            ### 🧪 Testing
+            - ✅ Unit tests passed
+            - ✅ Build successful
+            - ✅ Security audit clean
+            
+            ### 📊 Review Checklist
+            - [ ] Review updated dependencies
+            - [ ] Check for breaking changes
+            - [ ] Verify test coverage
+            - [ ] Approve and merge if all checks pass
+            
+            > 🤖 This PR was automatically created by the dependency update workflow.
+          branch: automated-dependency-updates
+          delete-branch: true
+
+  # Job 5: Security Summary
+  security-summary:
+    name: 📊 Security Summary
+    runs-on: ubuntu-latest
+    needs: [dependency-audit, docker-security-scan, code-security-analysis]
+    if: always()
+    
+    steps:
+      - name: 📊 Generate security summary
+        run: |
+          echo "# 🔒 Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "## 📊 Scan Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Dependency Audit
+          echo "### 🔍 Dependency Audit" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ needs.dependency-audit.result }}" == "success" ]; then
+            echo "- Status: ✅ Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- Status: ❌ Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Docker Security Scan
+          echo "### 🐳 Docker Security Scan" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ needs.docker-security-scan.result }}" == "success" ]; then
+            echo "- Status: ✅ Completed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- Status: ❌ Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Code Security Analysis
+          echo "### 🔍 Code Security Analysis" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ needs.code-security-analysis.result }}" == "success" ]; then
+            echo "- Status: ✅ Completed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- Status: ❌ Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "## 📈 Security Dashboard" >> $GITHUB_STEP_SUMMARY
+          echo "- [Security Advisories](https://github.com/${{ github.repository }}/security/advisories)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Dependency Graph](https://github.com/${{ github.repository }}/network/dependencies)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Code Scanning Alerts](https://github.com/${{ github.repository }}/security/code-scanning)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "## 🔧 Recommendations" >> $GITHUB_STEP_SUMMARY
+          echo "- Review and address any security alerts" >> $GITHUB_STEP_SUMMARY
+          echo "- Keep dependencies up to date" >> $GITHUB_STEP_SUMMARY
+          echo "- Monitor security advisories regularly" >> $GITHUB_STEP_SUMMARY
+          echo "- Run security scans before deployment" >> $GITHUB_STEP_SUMMARY
