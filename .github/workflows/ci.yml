@@ -119,10 +119,21 @@ jobs:
       - name: 🧪 Run ${{ matrix.test-type }}
         run: |
           mkdir -p test-results coverage
-          docker run --rm \
-            -v ${{ github.workspace }}/test-results:/app/test-results \
-            -v ${{ github.workspace }}/coverage:/app/coverage \
-            car-insurance-${{ matrix.test-type }}:latest
+          if [ "${{ matrix.test-type }}" = "unit-tests" ]; then
+            # Unit tests don't need database services
+            docker run --rm \
+              -v ${{ github.workspace }}/test-results:/app/test-results \
+              -v ${{ github.workspace }}/coverage:/app/coverage \
+              car-insurance-${{ matrix.test-type }}:latest
+          else
+            # Integration tests need database services
+            docker-compose -f docker-compose.test.yml --profile ${{ matrix.test-type }} up --build --exit-code-from ${{ matrix.test-type }}
+          fi
+
+      - name: 🧹 Cleanup Docker services
+        if: always() && matrix.test-type == 'integration-tests'
+        run: |
+          docker-compose -f docker-compose.test.yml --profile ${{ matrix.test-type }} down -v || true
 
       - name: 📊 Upload test results
         uses: actions/upload-artifact@v4
