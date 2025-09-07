@@ -87,8 +87,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Log successful initialization
-INSERT INTO pg_stat_statements_info (dealloc) VALUES (0) ON CONFLICT DO NOTHING;
+-- Log successful initialization (skip if extension not available)
+-- INSERT INTO pg_stat_statements_info (dealloc) VALUES (0) ON CONFLICT DO NOTHING;
 
 -- Display initialization success message
 DO $$

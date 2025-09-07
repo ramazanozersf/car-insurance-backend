@@ -46,7 +46,7 @@ CMD ["npm", "run", "test:all"]
 
 # Multi-stage builds for different test types
 FROM test-base AS unit-tests
-CMD ["npm", "run", "test:unit:cov"]
+CMD ["sh", "/app/scripts/run-unit-tests.sh"]
 
 FROM test-base AS integration-tests
 # Wait for database to be ready

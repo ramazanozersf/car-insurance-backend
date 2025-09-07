@@ -25,6 +25,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "test:all": "npm run test:unit && npm run test:integration && npm run test:e2e",
     "test:ci": "npm run test:unit:cov && npm run test:integration && npm run test:e2e",
+    "test:docker": "jest --config jest.docker.config.js --coverage",
     "docker:build": "docker build -t car-insurance-backend .",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
