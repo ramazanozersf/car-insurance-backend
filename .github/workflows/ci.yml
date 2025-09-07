@@ -127,13 +127,13 @@ jobs:
               car-insurance-${{ matrix.test-type }}:latest
           else
             # Integration tests need database services
-            docker-compose -f docker-compose.test.yml --profile ${{ matrix.test-type }} up --build --exit-code-from ${{ matrix.test-type }}
+            docker compose -f docker-compose.test.yml --profile ${{ matrix.test-type }} up --build --exit-code-from ${{ matrix.test-type }}
           fi
 
       - name: 🧹 Cleanup Docker services
         if: always() && matrix.test-type == 'integration-tests'
         run: |
-          docker-compose -f docker-compose.test.yml --profile ${{ matrix.test-type }} down -v || true
+          docker compose -f docker-compose.test.yml --profile ${{ matrix.test-type }} down -v || true
 
       - name: 📊 Upload test results
         uses: actions/upload-artifact@v4
@@ -220,23 +220,23 @@ jobs:
 
       - name: 🚀 Start services with Docker Compose
         run: |
-          docker-compose -f docker-compose.test.yml --profile all-tests up -d --build
+          docker compose -f docker-compose.test.yml --profile all-tests up -d --build
           
       - name: ⏳ Wait for services to be ready
         run: |
-          timeout 300 bash -c 'until docker-compose -f docker-compose.test.yml logs test-db | grep -q "database system is ready"; do sleep 5; done'
-          timeout 300 bash -c 'until docker-compose -f docker-compose.test.yml logs app-test | grep -q "Application is running"; do sleep 5; done'
+          timeout 300 bash -c 'until docker compose -f docker-compose.test.yml logs test-db | grep -q "database system is ready"; do sleep 5; done'
+          timeout 300 bash -c 'until docker compose -f docker-compose.test.yml logs app-test | grep -q "Application is running"; do sleep 5; done'
 
       - name: 🎭 Run E2E tests
         run: |
-          docker-compose -f docker-compose.test.yml --profile e2e-tests up --abort-on-container-exit
+          docker compose -f docker-compose.test.yml --profile e2e-tests up --abort-on-container-exit
           
       - name: 📊 Collect test results
         if: always()
         run: |
           mkdir -p e2e-results
-          docker-compose -f docker-compose.test.yml logs e2e-tests > e2e-results/e2e-logs.txt
-          docker cp $(docker-compose -f docker-compose.test.yml ps -q e2e-tests):/app/test-results/. e2e-results/ || true
+          docker compose -f docker-compose.test.yml logs e2e-tests > e2e-results/e2e-logs.txt
+          docker cp $(docker compose -f docker-compose.test.yml ps -q e2e-tests):/app/test-results/. e2e-results/ || true
 
       - name: 📊 Upload E2E test results
         uses: actions/upload-artifact@v4
@@ -248,7 +248,7 @@ jobs:
 
       - name: 🧹 Cleanup Docker Compose
         if: always()
-        run: docker-compose -f docker-compose.test.yml down -v
+        run: docker compose -f docker-compose.test.yml down -v
 
   # Job 6: Security Scanning
   security-scan:
