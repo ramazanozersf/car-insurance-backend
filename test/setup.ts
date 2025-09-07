@@ -4,7 +4,7 @@ import 'reflect-metadata';
 beforeAll(() => {
   // Set test environment
   process.env.NODE_ENV = 'test';
-  
+
   // Mock console methods to reduce noise in tests
   jest.spyOn(console, 'log').mockImplementation(() => {});
   jest.spyOn(console, 'warn').mockImplementation(() => {});
@@ -28,7 +28,7 @@ global.testUtils = {
     createdAt: new Date(),
     updatedAt: new Date(),
   }),
-  
+
   createMockVehicle: () => ({
     id: 'test-vehicle-id',
     vin: 'TEST123456789VIN',
@@ -40,7 +40,7 @@ global.testUtils = {
     createdAt: new Date(),
     updatedAt: new Date(),
   }),
-  
+
   createMockQuote: () => ({
     id: 'test-quote-id',
     quoteNumber: 'Q-TEST-001',
@@ -70,7 +70,7 @@ declare global {
       toBeValidPhoneNumber(): R;
     }
   }
-  
+
   var testUtils: {
     createMockUser: () => any;
     createMockVehicle: () => any;
@@ -81,9 +81,10 @@ declare global {
 // Custom Jest matchers
 expect.extend({
   toBeValidUUID(received: string) {
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     const pass = uuidRegex.test(received);
-    
+
     if (pass) {
       return {
         message: () => `expected ${received} not to be a valid UUID`,
@@ -96,11 +97,11 @@ expect.extend({
       };
     }
   },
-  
+
   toBeValidEmail(received: string) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const pass = emailRegex.test(received);
-    
+
     if (pass) {
       return {
         message: () => `expected ${received} not to be a valid email`,
@@ -113,11 +114,11 @@ expect.extend({
       };
     }
   },
-  
+
   toBeValidPhoneNumber(received: string) {
     const phoneRegex = /^\+[1-9]\d{1,14}$/;
     const pass = phoneRegex.test(received);
-    
+
     if (pass) {
       return {
         message: () => `expected ${received} not to be a valid phone number`,

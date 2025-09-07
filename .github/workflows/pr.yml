@@ -5,6 +5,12 @@ on:
     branches: [ main, develop ]
     types: [opened, synchronize, reopened, ready_for_review]
 
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  checks: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -161,21 +167,21 @@ jobs:
       - name: 🐳 Test Docker Compose build
         run: |
           # Test that docker-compose files are valid
-          docker-compose -f docker-compose.yml config
-          docker-compose -f docker-compose.test.yml config
+          docker compose -f docker-compose.yml config
+          docker compose -f docker-compose.test.yml config
 
       - name: 🧪 Quick Docker test
         run: |
           # Build and run a quick test
-          docker-compose -f docker-compose.test.yml --profile unit-tests build
+          docker compose -f docker-compose.test.yml --profile unit-tests build
           
           # Run unit tests in Docker
           mkdir -p test-results
-          docker-compose -f docker-compose.test.yml --profile unit-tests up --abort-on-container-exit
+          docker compose -f docker-compose.test.yml --profile unit-tests up --abort-on-container-exit
           
       - name: 🧹 Cleanup
         if: always()
-        run: docker-compose -f docker-compose.test.yml down -v
+        run: docker compose -f docker-compose.test.yml down -v
 
   # Job 5: PR Summary
   pr-summary:

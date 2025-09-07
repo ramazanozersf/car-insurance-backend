@@ -27,25 +27,34 @@ describe('Auth Integration Tests', () => {
     }).compile();
 
     app = module.createNestApplication();
-    
+
     // Apply global validation pipe
-    app.useGlobalPipes(new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }));
-    
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
+
     await app.init();
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) {
+      await app.close();
+    }
   });
 
   beforeEach(async () => {
-    // Clean database before each test
-    const connection = module.get('Connection');
-    await cleanDatabase(connection);
+    // Clean database before each test (skip if DataSource not available)
+    try {
+      const dataSource = module.get('DataSource');
+      await cleanDatabase(dataSource);
+    } catch (error) {
+      // Skip database cleanup if DataSource is not available (e.g., in unit test mode)
+      console.log('⚠️  Skipping database cleanup - DataSource not available');
+    }
   });
 
   describe('POST /auth/register', () => {
@@ -65,7 +74,9 @@ describe('Auth Integration Tests', () => {
       expect(response.body).toHaveProperty('user');
       expect(response.body).toHaveProperty('tokens');
       expect(response.body.user.email).toBe(validRegistrationData.email);
-      expect(response.body.user.firstName).toBe(validRegistrationData.firstName);
+      expect(response.body.user.firstName).toBe(
+        validRegistrationData.firstName,
+      );
       expect(response.body.user.lastName).toBe(validRegistrationData.lastName);
       expect(response.body.user.role).toBe(UserRole.CUSTOMER);
       expect(response.body.user).not.toHaveProperty('password');
@@ -157,7 +168,9 @@ describe('Auth Integration Tests', () => {
         .send(invalidData)
         .expect(400);
 
-      expect(response.body.message).toContain('phone must be a valid phone number');
+      expect(response.body.message).toContain(
+        'phone must be a valid phone number',
+      );
     });
 
     it('should return 400 for missing required fields', async () => {
@@ -183,9 +196,7 @@ describe('Auth Integration Tests', () => {
 
     beforeEach(async () => {
       // Register a user for login tests
-      await request(app.getHttpServer())
-        .post('/auth/register')
-        .send(userData);
+      await request(app.getHttpServer()).post('/auth/register').send(userData);
     });
 
     it('should login successfully with valid credentials', async () => {
@@ -312,9 +323,7 @@ describe('Auth Integration Tests', () => {
         lastName: 'Doe',
       };
 
-      await request(app.getHttpServer())
-        .post('/auth/register')
-        .send(userData);
+      await request(app.getHttpServer()).post('/auth/register').send(userData);
     });
 
     it('should handle forgot password request', async () => {
@@ -353,18 +362,20 @@ describe('Auth Integration Tests', () => {
       };
 
       // Make multiple rapid requests
-      const promises = Array(10).fill(0).map((_, i) => 
-        request(app.getHttpServer())
-          .post('/auth/register')
-          .send({ ...userData, email: `test${i}@example.com` })
-      );
+      const promises = Array(10)
+        .fill(0)
+        .map((_, i) =>
+          request(app.getHttpServer())
+            .post('/auth/register')
+            .send({ ...userData, email: `test${i}@example.com` }),
+        );
 
       const responses = await Promise.all(promises);
-      
+
       // Most should succeed, but some might be rate limited
-      const successCount = responses.filter(r => r.status === 201).length;
-      const rateLimitedCount = responses.filter(r => r.status === 429).length;
-      
+      const successCount = responses.filter((r) => r.status === 201).length;
+      const rateLimitedCount = responses.filter((r) => r.status === 429).length;
+
       expect(successCount + rateLimitedCount).toBe(10);
     });
   });

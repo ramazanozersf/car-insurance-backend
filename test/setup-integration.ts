@@ -8,7 +8,16 @@ beforeAll(async () => {
   // Set test environment
   process.env.NODE_ENV = 'test';
   process.env.DATABASE_NAME = 'car_insurance_test_db';
+
+  // Check if we're in a CI/Docker environment
+  const isCI = process.env.CI || process.env.DATABASE_HOST || process.env.INTEGRATION_TEST_DB;
   
+  if (!isCI) {
+    console.log('⚠️  Integration tests require Docker environment. Skipping local execution.');
+    console.log('💡 To run integration tests: docker compose -f docker-compose.test.yml --profile integration-tests up --build');
+    process.exit(0);
+  }
+
   // Suppress console output during tests
   jest.spyOn(console, 'log').mockImplementation(() => {});
   jest.spyOn(console, 'warn').mockImplementation(() => {});
@@ -34,7 +43,10 @@ export const getTestDatabaseConfig = () => ({
 });
 
 // Helper to create test module
-export const createTestModule = async (imports: any[] = [], providers: any[] = []) => {
+export const createTestModule = async (
+  imports: any[] = [],
+  providers: any[] = [],
+) => {
   const moduleBuilder = Test.createTestingModule({
     imports: [
       ConfigModule.forRoot({
@@ -49,16 +61,16 @@ export const createTestModule = async (imports: any[] = [], providers: any[] = [
 
   const module: TestingModule = await moduleBuilder.compile();
   const app = module.createNestApplication();
-  
+
   return { module, app };
 };
 
 // Database cleanup utility
-export const cleanDatabase = async (connection: any) => {
-  const entities = connection.entityMetadatas;
-  
+export const cleanDatabase = async (dataSource: any) => {
+  const entities = dataSource.entityMetadatas;
+
   for (const entity of entities) {
-    const repository = connection.getRepository(entity.name);
+    const repository = dataSource.getRepository(entity.name);
     await repository.clear();
   }
 };

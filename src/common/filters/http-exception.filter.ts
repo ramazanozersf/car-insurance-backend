@@ -26,7 +26,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       message: exception.message || null,
     };
 
-    if (status === HttpStatus.INTERNAL_SERVER_ERROR) {
+    if (status === 500) {
       this.logger.error(
         `${request.method} ${request.url}`,
         exception.stack,

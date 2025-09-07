@@ -76,7 +76,7 @@ jobs:
       - name: 🐳 Run full Docker Compose test suite
         run: |
           # Run all tests with Docker Compose
-          docker-compose -f docker-compose.test.yml --profile all-tests up --build --abort-on-container-exit
+          docker compose -f docker-compose.test.yml --profile all-tests up --build --abort-on-container-exit
           
       - name: 📊 Collect test results
         if: always()
@@ -84,9 +84,9 @@ jobs:
           mkdir -p deployment-test-results
           
           # Collect logs from all test containers
-          docker-compose -f docker-compose.test.yml logs unit-tests > deployment-test-results/unit-tests.log || true
-          docker-compose -f docker-compose.test.yml logs integration-tests > deployment-test-results/integration-tests.log || true
-          docker-compose -f docker-compose.test.yml logs e2e-tests > deployment-test-results/e2e-tests.log || true
+          docker compose -f docker-compose.test.yml logs unit-tests > deployment-test-results/unit-tests.log || true
+          docker compose -f docker-compose.test.yml logs integration-tests > deployment-test-results/integration-tests.log || true
+          docker compose -f docker-compose.test.yml logs e2e-tests > deployment-test-results/e2e-tests.log || true
           
       - name: 📊 Upload deployment test results
         uses: actions/upload-artifact@v4
@@ -98,7 +98,7 @@ jobs:
 
       - name: 🧹 Cleanup
         if: always()
-        run: docker-compose -f docker-compose.test.yml down -v
+        run: docker compose -f docker-compose.test.yml down -v
 
   # Job 3: Build and Push (if not using existing image)
   build-and-push:
