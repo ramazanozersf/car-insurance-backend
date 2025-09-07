@@ -166,11 +166,6 @@ jobs:
 
       redis:
         image: redis:7-alpine
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
         ports:
           - 6379:6379
 
@@ -190,7 +185,7 @@ jobs:
       - name: ⏳ Wait for services
         run: |
           timeout 60 bash -c 'until pg_isready -h localhost -p 5432 -U postgres; do sleep 1; done'
-          timeout 60 bash -c 'until redis-cli -h localhost -p 6379 ping; do sleep 1; done'
+          timeout 60 bash -c 'until nc -z localhost 6379; do sleep 1; done'
 
       - name: 🔗 Run integration tests
         env:
