@@ -3,12 +3,11 @@ import {
   Column,
   ManyToOne,
   JoinColumn,
-  OneToMany,
   OneToOne,
   BeforeInsert,
   BeforeUpdate,
 } from 'typeorm';
-import { IsNotEmpty, IsEnum, IsNumber, IsDate, Min, Max, IsOptional } from 'class-validator';
+import { IsNotEmpty, IsEnum, IsNumber, IsDate, Min, Max } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { BaseEntity } from './base.entity';
 import { User } from './user.entity';
@@ -32,12 +31,12 @@ export class Policy extends BaseEntity {
 
   @Column({ type: 'date' })
   @IsDate({ message: 'Effective date must be a valid date' })
-  @Transform(({ value }) => new Date(value))
+  @Transform(({ value }) => value instanceof Date ? value : new Date(value as string))
   effectiveDate: Date;
 
   @Column({ type: 'date' })
   @IsDate({ message: 'Expiration date must be a valid date' })
-  @Transform(({ value }) => new Date(value))
+  @Transform(({ value }) => value instanceof Date ? value : new Date(value as string))
   expirationDate: Date;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
