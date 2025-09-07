@@ -9,7 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import * as bcrypt from 'bcryptjs';
+// bcrypt is used in User entity for password hashing
 import { v4 as uuidv4 } from 'uuid';
 import { User } from '../../shared/entities';
 import { UserRole } from '../../shared/enums';
@@ -24,11 +24,15 @@ export class AuthService {
     private configService: ConfigService,
   ) {}
 
-  async register(registerDto: RegisterDto): Promise<{ user: User; tokens: any }> {
+  async register(
+    registerDto: RegisterDto,
+  ): Promise<{ user: User; tokens: any }> {
     const { email, password, firstName, lastName, phone, role } = registerDto;
 
     // Check if user already exists
-    const existingUser = await this.userRepository.findOne({ where: { email } });
+    const existingUser = await this.userRepository.findOne({
+      where: { email },
+    });
     if (existingUser) {
       throw new ConflictException('User with this email already exists');
     }
@@ -50,7 +54,11 @@ export class AuthService {
     const tokens = await this.generateTokens(user);
 
     // Remove sensitive data
-    const { password: userPassword, emailVerificationToken, ...userWithoutSensitiveData } = user;
+    const {
+      password: userPassword,
+      emailVerificationToken,
+      ...userWithoutSensitiveData
+    } = user;
 
     return { user: userWithoutSensitiveData as User, tokens };
   }
@@ -61,7 +69,15 @@ export class AuthService {
     // Find user with password
     const user = await this.userRepository.findOne({
       where: { email },
-      select: ['id', 'email', 'password', 'firstName', 'lastName', 'role', 'isActive'],
+      select: [
+        'id',
+        'email',
+        'password',
+        'firstName',
+        'lastName',
+        'role',
+        'isActive',
+      ],
     });
 
     if (!user || !user.isActive) {
@@ -86,7 +102,9 @@ export class AuthService {
     return { user: userWithoutPassword as User, tokens };
   }
 
-  async refreshToken(refreshTokenDto: RefreshTokenDto): Promise<{ tokens: any }> {
+  async refreshToken(
+    refreshTokenDto: RefreshTokenDto,
+  ): Promise<{ tokens: any }> {
     const { refreshToken } = refreshTokenDto;
 
     try {
@@ -112,7 +130,15 @@ export class AuthService {
   async validateUser(email: string, password: string): Promise<User | null> {
     const user = await this.userRepository.findOne({
       where: { email },
-      select: ['id', 'email', 'password', 'firstName', 'lastName', 'role', 'isActive'],
+      select: [
+        'id',
+        'email',
+        'password',
+        'firstName',
+        'lastName',
+        'role',
+        'isActive',
+      ],
     });
 
     if (user && user.isActive && (await user.validatePassword(password))) {
@@ -179,7 +205,11 @@ export class AuthService {
       },
     });
 
-    if (!user || !user.passwordResetExpires || user.passwordResetExpires < new Date()) {
+    if (
+      !user ||
+      !user.passwordResetExpires ||
+      user.passwordResetExpires < new Date()
+    ) {
       throw new BadRequestException('Invalid or expired reset token');
     }
 

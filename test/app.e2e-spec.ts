@@ -20,22 +20,24 @@ describe('Car Insurance Backend (e2e)', () => {
         AppModule,
       ],
     })
-    .overrideModule(TypeOrmModule.forRoot())
-    .useModule(TypeOrmModule.forRoot(getTestDatabaseConfig()))
-    .compile();
+      .overrideModule(TypeOrmModule.forRoot())
+      .useModule(TypeOrmModule.forRoot(getTestDatabaseConfig()))
+      .compile();
 
     app = module.createNestApplication();
-    
+
     // Apply global validation pipe
-    app.useGlobalPipes(new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }));
-    
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
+
     // Set global prefix
     app.setGlobalPrefix('api/v1');
-    
+
     await app.init();
   });
 
@@ -91,11 +93,11 @@ describe('Car Insurance Backend (e2e)', () => {
 
       expect(registerResponse.body).toHaveProperty('user');
       expect(registerResponse.body).toHaveProperty('tokens');
-      
+
       const { user, tokens } = registerResponse.body;
       expect(user.email).toBe(testUser.email);
       expect(user).not.toHaveProperty('password');
-      
+
       accessToken = tokens.accessToken;
       refreshToken = tokens.refreshToken;
 
@@ -127,7 +129,9 @@ describe('Car Insurance Backend (e2e)', () => {
         .send({ email: testUser.email })
         .expect(200);
 
-      expect(forgotPasswordResponse.body.message).toContain('reset link has been sent');
+      expect(forgotPasswordResponse.body.message).toContain(
+        'reset link has been sent',
+      );
     });
 
     it('should handle authentication errors properly', async () => {
@@ -161,10 +165,8 @@ describe('Car Insurance Backend (e2e)', () => {
     it('should require authentication for protected endpoints', async () => {
       // This test would be expanded when we add protected endpoints
       // For now, we test that public endpoints work without auth
-      
-      await request(app.getHttpServer())
-        .get('/api/v1/health')
-        .expect(200);
+
+      await request(app.getHttpServer()).get('/api/v1/health').expect(200);
     });
 
     it('should validate request bodies', async () => {
@@ -214,25 +216,23 @@ describe('Car Insurance Backend (e2e)', () => {
   describe('Performance', () => {
     it('should respond to health check within reasonable time', async () => {
       const start = Date.now();
-      
-      await request(app.getHttpServer())
-        .get('/api/v1/health')
-        .expect(200);
-      
+
+      await request(app.getHttpServer()).get('/api/v1/health').expect(200);
+
       const duration = Date.now() - start;
       expect(duration).toBeLessThan(1000); // Should respond within 1 second
     });
 
     it('should handle concurrent requests', async () => {
-      const promises = Array(10).fill(0).map(() =>
-        request(app.getHttpServer())
-          .get('/api/v1/health')
-          .expect(200)
-      );
+      const promises = Array(10)
+        .fill(0)
+        .map(() =>
+          request(app.getHttpServer()).get('/api/v1/health').expect(200),
+        );
 
       const responses = await Promise.all(promises);
       expect(responses).toHaveLength(10);
-      responses.forEach(response => {
+      responses.forEach((response) => {
         expect(response.body.status).toBe('ok');
       });
     });

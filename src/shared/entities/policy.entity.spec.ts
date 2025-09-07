@@ -19,8 +19,10 @@ describe('Policy Entity', () => {
       // Set dates to ensure policy is currently active
       const now = new Date();
       policy.effectiveDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
-      policy.expirationDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
-      
+      policy.expirationDate = new Date(
+        now.getTime() + 30 * 24 * 60 * 60 * 1000,
+      ); // 30 days from now
+
       expect(policy.isActive()).toBe(true);
     });
 
@@ -33,7 +35,7 @@ describe('Policy Entity', () => {
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       policy.effectiveDate = tomorrow;
-      
+
       expect(policy.isActive()).toBe(false);
     });
   });
@@ -55,7 +57,7 @@ describe('Policy Entity', () => {
       const futureDate = new Date();
       futureDate.setDate(futureDate.getDate() + 30);
       policy.expirationDate = futureDate;
-      
+
       const days = policy.getDaysUntilExpiration();
       expect(days).toBe(30);
     });
@@ -64,7 +66,7 @@ describe('Policy Entity', () => {
       const pastDate = new Date();
       pastDate.setDate(pastDate.getDate() - 10);
       policy.expirationDate = pastDate;
-      
+
       const days = policy.getDaysUntilExpiration();
       expect(days).toBeLessThan(0);
     });
@@ -75,7 +77,7 @@ describe('Policy Entity', () => {
       const futureDate = new Date();
       futureDate.setDate(futureDate.getDate() + 15); // 15 days from now
       policy.expirationDate = futureDate;
-      
+
       expect(policy.needsRenewal()).toBe(true);
     });
 
@@ -83,7 +85,7 @@ describe('Policy Entity', () => {
       const futureDate = new Date();
       futureDate.setDate(futureDate.getDate() + 45); // 45 days from now
       policy.expirationDate = futureDate;
-      
+
       expect(policy.needsRenewal()).toBe(false);
     });
 
@@ -91,7 +93,7 @@ describe('Policy Entity', () => {
       const pastDate = new Date();
       pastDate.setDate(pastDate.getDate() - 5); // 5 days ago
       policy.expirationDate = pastDate;
-      
+
       expect(policy.needsRenewal()).toBe(false);
     });
   });
@@ -101,7 +103,7 @@ describe('Policy Entity', () => {
       policy.effectiveDate = new Date('2024-01-01');
       policy.expirationDate = new Date('2024-12-31');
       policy.monthlyPremium = 100;
-      
+
       // Note: This is an approximation since we're calculating months
       const totalPremium = policy.calculateTotalPremium();
       expect(totalPremium).toBeGreaterThan(0);
@@ -114,7 +116,7 @@ describe('Policy Entity', () => {
       pastDue.setDate(pastDue.getDate() - 5); // 5 days ago
       policy.nextPaymentDue = pastDue;
       policy.gracePeriodDays = 10;
-      
+
       expect(policy.isInGracePeriod()).toBe(true);
     });
 
@@ -122,7 +124,7 @@ describe('Policy Entity', () => {
       const futureDate = new Date();
       futureDate.setDate(futureDate.getDate() + 5); // 5 days from now
       policy.nextPaymentDue = futureDate;
-      
+
       expect(policy.isInGracePeriod()).toBe(false);
     });
 
@@ -136,21 +138,25 @@ describe('Policy Entity', () => {
     it('should throw error when effective date is after expiration date', () => {
       policy.effectiveDate = new Date('2024-12-31');
       policy.expirationDate = new Date('2024-01-01');
-      
-      expect(() => policy.validateDates()).toThrow('Effective date must be before expiration date');
+
+      expect(() => policy.validateDates()).toThrow(
+        'Effective date must be before expiration date',
+      );
     });
 
     it('should throw error when policy term exceeds one year', () => {
       policy.effectiveDate = new Date('2024-01-01');
       policy.expirationDate = new Date('2025-02-01'); // More than 1 year
-      
-      expect(() => policy.validateDates()).toThrow('Policy term cannot exceed one year');
+
+      expect(() => policy.validateDates()).toThrow(
+        'Policy term cannot exceed one year',
+      );
     });
 
     it('should not throw error for valid dates', () => {
       policy.effectiveDate = new Date('2024-01-01');
       policy.expirationDate = new Date('2024-12-31');
-      
+
       expect(() => policy.validateDates()).not.toThrow();
     });
   });
@@ -159,7 +165,7 @@ describe('Policy Entity', () => {
     it('should generate policy number when not provided', () => {
       policy.policyNumber = undefined;
       policy.generatePolicyNumber();
-      
+
       expect(policy.policyNumber).toBeDefined();
       expect(policy.policyNumber).toMatch(/^POL-\d+-\d{3}$/);
     });
@@ -168,7 +174,7 @@ describe('Policy Entity', () => {
       const existingNumber = 'EXISTING-123';
       policy.policyNumber = existingNumber;
       policy.generatePolicyNumber();
-      
+
       expect(policy.policyNumber).toBe(existingNumber);
     });
   });

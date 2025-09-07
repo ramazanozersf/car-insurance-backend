@@ -20,14 +20,18 @@ export class TestHelpers {
     const response = await request(this.app.getHttpServer())
       .post('/api/v1/auth/login')
       .send({ email, password });
-    
+
     return response.body.tokens;
   }
 
   /**
    * Create an authenticated request with JWT token
    */
-  authenticatedRequest(method: 'get' | 'post' | 'put' | 'delete', url: string, token: string) {
+  authenticatedRequest(
+    method: 'get' | 'post' | 'put' | 'delete',
+    url: string,
+    token: string,
+  ) {
     return request(this.app.getHttpServer())
       [method](url)
       .set('Authorization', `Bearer ${token}`);
@@ -50,7 +54,7 @@ export class TestHelpers {
    * Wait for a specified amount of time
    */
   async wait(ms: number) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**
@@ -98,7 +102,9 @@ export class TestHelpers {
       paymentFrequency: 'monthly',
       monthlyPremium: 100,
       effectiveDate: new Date().toISOString().split('T')[0],
-      expirationDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      expirationDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .split('T')[0],
       coverageDetails: {
         liability: { limit: 100000, deductible: 500 },
         collision: { limit: 50000, deductible: 1000 },
@@ -117,15 +123,15 @@ export class DatabaseTestUtils {
    */
   static async truncateAllTables(connection: any) {
     const entities = connection.entityMetadatas;
-    
+
     // Disable foreign key checks
     await connection.query('SET FOREIGN_KEY_CHECKS = 0');
-    
+
     for (const entity of entities) {
       const repository = connection.getRepository(entity.name);
       await repository.clear();
     }
-    
+
     // Re-enable foreign key checks
     await connection.query('SET FOREIGN_KEY_CHECKS = 1');
   }

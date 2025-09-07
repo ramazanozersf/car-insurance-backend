@@ -7,7 +7,14 @@ import {
   BeforeInsert,
   BeforeUpdate,
 } from 'typeorm';
-import { IsNotEmpty, IsEnum, IsNumber, IsDate, Min, Max } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsEnum,
+  IsNumber,
+  IsDate,
+  Min,
+  Max,
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 import { BaseEntity } from './base.entity';
 import { User } from './user.entity';
@@ -31,16 +38,23 @@ export class Policy extends BaseEntity {
 
   @Column({ type: 'date' })
   @IsDate({ message: 'Effective date must be a valid date' })
-  @Transform(({ value }) => value instanceof Date ? value : new Date(value as string))
+  @Transform(({ value }) =>
+    value instanceof Date ? value : new Date(value as string),
+  )
   effectiveDate: Date;
 
   @Column({ type: 'date' })
   @IsDate({ message: 'Expiration date must be a valid date' })
-  @Transform(({ value }) => value instanceof Date ? value : new Date(value as string))
+  @Transform(({ value }) =>
+    value instanceof Date ? value : new Date(value as string),
+  )
   expirationDate: Date;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
-  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'Premium amount must be a valid number' })
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    { message: 'Premium amount must be a valid number' },
+  )
   @Min(0, { message: 'Premium amount must be positive' })
   @Max(999999.99, { message: 'Premium amount exceeds maximum limit' })
   premiumAmount: number;
@@ -50,7 +64,10 @@ export class Policy extends BaseEntity {
   paymentFrequency: string;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
-  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'Monthly premium must be a valid number' })
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    { message: 'Monthly premium must be a valid number' },
+  )
   @Min(0, { message: 'Monthly premium must be positive' })
   monthlyPremium: number;
 
@@ -141,11 +158,11 @@ export class Policy extends BaseEntity {
    */
   isInGracePeriod(): boolean {
     if (!this.nextPaymentDue) return false;
-    
+
     const now = new Date();
     const gracePeriodEnd = new Date(this.nextPaymentDue);
     gracePeriodEnd.setDate(gracePeriodEnd.getDate() + this.gracePeriodDays);
-    
+
     return now > this.nextPaymentDue && now <= gracePeriodEnd;
   }
 
@@ -162,7 +179,9 @@ export class Policy extends BaseEntity {
    * Check if policy needs renewal (within 30 days of expiration)
    */
   needsRenewal(): boolean {
-    return this.getDaysUntilExpiration() <= 30 && this.getDaysUntilExpiration() > 0;
+    return (
+      this.getDaysUntilExpiration() <= 30 && this.getDaysUntilExpiration() > 0
+    );
   }
 
   /**
@@ -179,10 +198,10 @@ export class Policy extends BaseEntity {
   private getTermInMonths(): number {
     const startDate = new Date(this.effectiveDate);
     const endDate = new Date(this.expirationDate);
-    
+
     const yearDiff = endDate.getFullYear() - startDate.getFullYear();
     const monthDiff = endDate.getMonth() - startDate.getMonth();
-    
+
     return yearDiff * 12 + monthDiff;
   }
 
@@ -202,7 +221,7 @@ export class Policy extends BaseEntity {
     if (this.effectiveDate && this.expirationDate) {
       const oneYearLater = new Date(this.effectiveDate);
       oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
-      
+
       if (this.expirationDate > oneYearLater) {
         throw new Error('Policy term cannot exceed one year');
       }
@@ -216,7 +235,9 @@ export class Policy extends BaseEntity {
   generatePolicyNumber(): void {
     if (!this.policyNumber) {
       const timestamp = Date.now().toString();
-      const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+      const random = Math.floor(Math.random() * 1000)
+        .toString()
+        .padStart(3, '0');
       this.policyNumber = `POL-${timestamp}-${random}`;
     }
   }

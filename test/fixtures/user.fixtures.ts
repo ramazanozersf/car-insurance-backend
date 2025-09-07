@@ -3,7 +3,7 @@ import { UserRole } from '../../src/shared/enums';
 
 export const createUserFixture = (overrides: Partial<User> = {}): User => {
   const user = new User();
-  
+
   user.id = 'test-user-id';
   user.firstName = 'John';
   user.lastName = 'Doe';
@@ -15,7 +15,7 @@ export const createUserFixture = (overrides: Partial<User> = {}): User => {
   user.isActive = true;
   user.createdAt = new Date('2023-01-01');
   user.updatedAt = new Date('2023-01-01');
-  
+
   return Object.assign(user, overrides);
 };
 

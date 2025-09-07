@@ -8,7 +8,7 @@ beforeAll(async () => {
   // Set test environment
   process.env.NODE_ENV = 'test';
   process.env.DATABASE_NAME = 'car_insurance_test_db';
-  
+
   // Suppress console output during tests
   jest.spyOn(console, 'log').mockImplementation(() => {});
   jest.spyOn(console, 'warn').mockImplementation(() => {});
@@ -34,7 +34,10 @@ export const getTestDatabaseConfig = () => ({
 });
 
 // Helper to create test module
-export const createTestModule = async (imports: any[] = [], providers: any[] = []) => {
+export const createTestModule = async (
+  imports: any[] = [],
+  providers: any[] = [],
+) => {
   const moduleBuilder = Test.createTestingModule({
     imports: [
       ConfigModule.forRoot({
@@ -49,14 +52,14 @@ export const createTestModule = async (imports: any[] = [], providers: any[] = [
 
   const module: TestingModule = await moduleBuilder.compile();
   const app = module.createNestApplication();
-  
+
   return { module, app };
 };
 
 // Database cleanup utility
 export const cleanDatabase = async (connection: any) => {
   const entities = connection.entityMetadatas;
-  
+
   for (const entity of entities) {
     const repository = connection.getRepository(entity.name);
     await repository.clear();

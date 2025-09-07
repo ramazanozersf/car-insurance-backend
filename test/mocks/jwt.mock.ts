@@ -1,9 +1,15 @@
 export const mockJwtService = {
   sign: jest.fn().mockReturnValue('mock-jwt-token'),
   signAsync: jest.fn().mockResolvedValue('mock-jwt-token'),
-  verify: jest.fn().mockReturnValue({ sub: 'test-user-id', email: 'test@example.com' }),
-  verifyAsync: jest.fn().mockResolvedValue({ sub: 'test-user-id', email: 'test@example.com' }),
-  decode: jest.fn().mockReturnValue({ sub: 'test-user-id', email: 'test@example.com' }),
+  verify: jest
+    .fn()
+    .mockReturnValue({ sub: 'test-user-id', email: 'test@example.com' }),
+  verifyAsync: jest
+    .fn()
+    .mockResolvedValue({ sub: 'test-user-id', email: 'test@example.com' }),
+  decode: jest
+    .fn()
+    .mockReturnValue({ sub: 'test-user-id', email: 'test@example.com' }),
 };
 
 export const mockConfigService = {
