@@ -46,8 +46,8 @@ describe('Auth Integration Tests', () => {
 
   beforeEach(async () => {
     // Clean database before each test
-    const connection = module.get('Connection');
-    await cleanDatabase(connection);
+    const dataSource = module.get('DataSource');
+    await cleanDatabase(dataSource);
   });
 
   describe('POST /auth/register', () => {

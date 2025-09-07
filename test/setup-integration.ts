@@ -57,11 +57,11 @@ export const createTestModule = async (
 };
 
 // Database cleanup utility
-export const cleanDatabase = async (connection: any) => {
-  const entities = connection.entityMetadatas;
+export const cleanDatabase = async (dataSource: any) => {
+  const entities = dataSource.entityMetadatas;
 
   for (const entity of entities) {
-    const repository = connection.getRepository(entity.name);
+    const repository = dataSource.getRepository(entity.name);
     await repository.clear();
   }
 };
