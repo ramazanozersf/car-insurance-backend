@@ -1,0 +1,61 @@
+# Test Dockerfile for Car Insurance Backend
+FROM node:20-alpine AS test-base
+
+# Install system dependencies
+RUN apk add --no-cache \
+    postgresql-client \
+    curl \
+    bash
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install all dependencies (including dev dependencies for testing)
+RUN npm ci --ignore-scripts
+
+# Copy source code and test files
+COPY . .
+
+# Create test results directory
+RUN mkdir -p /app/test-results
+
+# Set environment variables for testing
+ENV NODE_ENV=test
+ENV DATABASE_HOST=test-db
+ENV DATABASE_PORT=5432
+ENV DATABASE_USERNAME=postgres
+ENV DATABASE_PASSWORD=testpassword
+ENV DATABASE_NAME=car_insurance_test_db
+ENV REDIS_HOST=test-redis
+ENV REDIS_PORT=6379
+ENV JWT_SECRET=test-jwt-secret-key-for-docker-testing
+ENV JWT_REFRESH_SECRET=test-refresh-secret-key-for-docker-testing
+
+# Build the application
+RUN npm run build
+
+# Health check for test container
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:3001/api/v1/health || exit 1
+
+# Default command runs all tests
+CMD ["npm", "run", "test:all"]
+
+# Multi-stage builds for different test types
+FROM test-base AS unit-tests
+CMD ["npm", "run", "test:unit:cov"]
+
+FROM test-base AS integration-tests
+# Wait for database to be ready
+CMD ["sh", "-c", "while ! pg_isready -h test-db -p 5432 -U postgres; do sleep 1; done && npm run test:integration"]
+
+FROM test-base AS e2e-tests
+# Wait for both database and main app to be ready
+CMD ["sh", "-c", "while ! pg_isready -h test-db -p 5432 -U postgres; do sleep 1; done && while ! curl -f http://app:3000/api/v1/health; do sleep 1; done && npm run test:e2e"]
+
+FROM test-base AS test-watch
+# For development - runs tests in watch mode
+CMD ["npm", "run", "test:unit:watch"]

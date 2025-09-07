@@ -1,0 +1,229 @@
+version: '3.8'
+
+services:
+  # Test Database Service
+  test-db:
+    image: postgres:15-alpine
+    container_name: car-insurance-test-db
+    environment:
+      POSTGRES_DB: car_insurance_test_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: testpassword
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+    ports:
+      - "5433:5432"
+    volumes:
+      - test_postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d car_insurance_test_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Test Redis Service
+  test-redis:
+    image: redis:7-alpine
+    container_name: car-insurance-test-redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - test_redis_data:/data
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Main Application for E2E Testing
+  app-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: car-insurance-app-test
+    environment:
+      NODE_ENV: test
+      DATABASE_HOST: test-db
+      DATABASE_PORT: 5432
+      DATABASE_USERNAME: postgres
+      DATABASE_PASSWORD: testpassword
+      DATABASE_NAME: car_insurance_test_db
+      REDIS_HOST: test-redis
+      REDIS_PORT: 6379
+      JWT_SECRET: test-jwt-secret-key-for-docker-testing
+      JWT_REFRESH_SECRET: test-refresh-secret-key-for-docker-testing
+      PORT: 3000
+    ports:
+      - "3001:3000"
+    depends_on:
+      test-db:
+        condition: service_healthy
+      test-redis:
+        condition: service_healthy
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # Unit Tests Service
+  unit-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+      target: unit-tests
+    container_name: car-insurance-unit-tests
+    volumes:
+      - ./coverage:/app/coverage
+      - ./test-results:/app/test-results
+    networks:
+      - test-network
+    profiles:
+      - unit-tests
+      - all-tests
+
+  # Integration Tests Service
+  integration-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+      target: integration-tests
+    container_name: car-insurance-integration-tests
+    environment:
+      DATABASE_HOST: test-db
+      DATABASE_PORT: 5432
+      DATABASE_USERNAME: postgres
+      DATABASE_PASSWORD: testpassword
+      DATABASE_NAME: car_insurance_test_db
+      REDIS_HOST: test-redis
+      REDIS_PORT: 6379
+    volumes:
+      - ./test-results:/app/test-results
+    depends_on:
+      test-db:
+        condition: service_healthy
+      test-redis:
+        condition: service_healthy
+    networks:
+      - test-network
+    profiles:
+      - integration-tests
+      - all-tests
+
+  # E2E Tests Service
+  e2e-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+      target: e2e-tests
+    container_name: car-insurance-e2e-tests
+    environment:
+      DATABASE_HOST: test-db
+      DATABASE_PORT: 5432
+      DATABASE_USERNAME: postgres
+      DATABASE_PASSWORD: testpassword
+      DATABASE_NAME: car_insurance_test_db
+      REDIS_HOST: test-redis
+      REDIS_PORT: 6379
+      TEST_APP_URL: http://app-test:3000
+    volumes:
+      - ./test-results:/app/test-results
+    depends_on:
+      test-db:
+        condition: service_healthy
+      test-redis:
+        condition: service_healthy
+      app-test:
+        condition: service_healthy
+    networks:
+      - test-network
+    profiles:
+      - e2e-tests
+      - all-tests
+
+  # Test Watch Service for Development
+  test-watch:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+      target: test-watch
+    container_name: car-insurance-test-watch
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - ./coverage:/app/coverage
+    networks:
+      - test-network
+    profiles:
+      - test-watch
+    stdin_open: true
+    tty: true
+
+  # Test Runner Service - Orchestrates all tests
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+      target: test-base
+    container_name: car-insurance-test-runner
+    environment:
+      DATABASE_HOST: test-db
+      DATABASE_PORT: 5432
+      DATABASE_USERNAME: postgres
+      DATABASE_PASSWORD: testpassword
+      DATABASE_NAME: car_insurance_test_db
+      REDIS_HOST: test-redis
+      REDIS_PORT: 6379
+    volumes:
+      - ./coverage:/app/coverage
+      - ./test-results:/app/test-results
+      - ./scripts:/app/scripts
+    depends_on:
+      test-db:
+        condition: service_healthy
+      test-redis:
+        condition: service_healthy
+    networks:
+      - test-network
+    profiles:
+      - test-runner
+      - all-tests
+    command: ["sh", "/app/scripts/run-all-tests.sh"]
+
+  # Test Results Viewer (Optional - for viewing test reports)
+  test-results-viewer:
+    image: nginx:alpine
+    container_name: car-insurance-test-results
+    ports:
+      - "8080:80"
+    volumes:
+      - ./coverage:/usr/share/nginx/html/coverage:ro
+      - ./test-results:/usr/share/nginx/html/test-results:ro
+      - ./scripts/nginx-test-results.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - test-network
+    profiles:
+      - test-results
+    depends_on:
+      - test-runner
+
+volumes:
+  test_postgres_data:
+    driver: local
+  test_redis_data:
+    driver: local
+
+networks:
+  test-network:
+    driver: bridge
+    name: car-insurance-test-network
