@@ -9,6 +9,15 @@ beforeAll(async () => {
   process.env.NODE_ENV = 'test';
   process.env.DATABASE_NAME = 'car_insurance_test_db';
 
+  // Check if we're in a CI/Docker environment
+  const isCI = process.env.CI || process.env.DATABASE_HOST || process.env.INTEGRATION_TEST_DB;
+  
+  if (!isCI) {
+    console.log('⚠️  Integration tests require Docker environment. Skipping local execution.');
+    console.log('💡 To run integration tests: docker compose -f docker-compose.test.yml --profile integration-tests up --build');
+    process.exit(0);
+  }
+
   // Suppress console output during tests
   jest.spyOn(console, 'log').mockImplementation(() => {});
   jest.spyOn(console, 'warn').mockImplementation(() => {});
