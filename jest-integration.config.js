@@ -8,7 +8,6 @@ module.exports = {
   moduleFileExtensions: ['js', 'json', 'ts'],
   
   // Test file patterns for integration tests
-  testRegex: '.*\\.integration\\.spec\\.ts$',
   testMatch: ['<rootDir>/test/integration/**/*.spec.ts'],
   
   // Transform configuration
